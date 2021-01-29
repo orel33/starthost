@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# echo "IFS=$IFS"
+HOSTFILE="./hosts.json"
 
 trap ctrl_c INT
 function ctrl_c() { echo "Abort!" && kill -9 $$ ; }
@@ -8,64 +8,109 @@ function ctrl_c() { echo "Abort!" && kill -9 $$ ; }
 # Pour lister l'état de toutes les machines avec Nagios3
 # https://services.emi.u-bordeaux.fr/nagios3/cgi-bin/status.cgi?hostgroup=all
 
-ROOM105="alia bellonda corba dama feydrautha ghanima halleck idaho lucila murbella noree odrade scytale sheeana stilgar talamane taraza tegs tuek usul"
-ROOM204="botero buffet cassatt escher goya kandinsky lautrec legreco marquet morissot opalka redon rembrandt seurat signac tissot velasquez vlaminck watteau whistler"
-ROOM008="beetlejuice braque cezanne chagall corot dali degas ernst gauguin leger leonardo magritte matisse millet miro modigliani monet pissarro renoir vangogh"
+# ROOM105="alia bellonda corba dama feydrautha ghanima halleck idaho lucila murbella noree odrade scytale sheeana stilgar talamane taraza tegs tuek usul"
+# ROOM204="botero buffet cassatt escher goya kandinsky lautrec legreco marquet morissot opalka redon rembrandt seurat signac tissot velasquez vlaminck watteau whistler"
+# ROOM008="beetlejuice braque cezanne chagall corot dali degas ernst gauguin leger leonardo magritte matisse millet miro modigliani monet pissarro renoir vangogh"
 
+# parse JSON file to get all hosts in a room
 function getRoom()
 {
     local ROOM="$1"
-    local HOSTS=$(jq -r ".SALLES[\"$ROOM\"] | .[]" < /net/ens/cremi_salle.json)
+    local HOSTS=$(jq -r ".SALLES[\"$ROOM\"] | .[]" < $HOSTFILE)
     local RET=$?
     ( IFS=$' ' ; echo "$HOSTS" )
     return $RET
 }
 
-# TODO: use /net/ens/cremi_salle.json
-# ROOM001=$(cat /net/ens/cremi_salle.json | jq -r '.SALLES["001"] | .[]')
-ROOM101=$(getRoom "101")
-ROOM104=$(getRoom "104")
+# ROOM101=$(getRoom "101")
+# ROOM104=$(getRoom "104")
+# CREMI="$ROOM104"
+# HOSTS="$HOST"
 
-# echo "ROOM 001: $ROOM001"
-# ( IFS=$' ' ; echo "ROOM 101: $ROOM101" )
+MODE="PING"
+HOSTS=""
 
-CREMI="$ROOM104"
+function usage() {
+    echo "Usage: ..."
+}
 
-if [ $# -eq  0 ] ; then
-   echo "===== Host Monitoring ====="
-   echo "ping..."
-   fping $CREMI
-   exit 0
-elif [ $# -eq 1 ] ; then
-   echo "===== Host Starting ====="
-   HOSTNAME="$1"
-else
-    echo "Usage: $0 hostname" && exit 1
-fi
+function getargs() {
+    while getopts "pt:r:h" OPT; do
+        case $OPT in
+            p)
+                MODE="PING"
+            ;;
+            b)
+                MODE="BOOT"
+            ;;
+            t)
+                HOSTS+=" $OPTARG"
+            ;;
+            r)
+                local ROOM="$OPTARG"
+                HOSTS+=$(getRoom "$ROOM")
+            ;;
+            h)
+                USAGE
+            ;;
+            \?)
+                echo "Invalid option!"
+                USAGE
+            ;;
+        esac
+    done
 
-# both linux & windows OS answers ping/ssh/...
-#  nc -v -z -w 1 <hostname> 3389
-# echo $? => 0=windows 
-# port 3389 = ms-wbt-server
+    # check args
+    if [ $# -eq 0 ] ; then USAGE ; fi
+    if [ -z "$MODE" ] ; then USAGE ; fi
 
-grep -w "\"$HOSTNAME\"" /net/ens/cremi_salle.json &> /dev/null
-[ ! $? -eq 0 ] && echo "Error: hostname not found!" && exit 1
+}
 
-ping -c 1 $HOSTNAME &> /dev/null
-[ $? -eq 0 ] && echo "Success: host $HOSTNAME already alive!" && exit 0
+#################### PING MODE ####################
 
-echo "Waking up $HOSTNAME, be patient. It can take few minutes..."
-wget -q --no-check-certificate  -O - "https://startup.emi.u-bordeaux.fr/wol?h[]=$HOSTNAME" &> /dev/null
-[ ! $? -eq 0 ] && echo "Error: wake on lan..." && exit 1
+function mping() {
+    echo "===== Host Monitoring ====="
+    local HOSTS="$1"
+    echo "ping..."
+    fping "$HOSTS"
+    return 0
+}
 
-while : ; do
-    echo -n "*"
+#################### BOOT MODE ####################
+
+function mboot() {
+    echo "===== Host Starting ====="
+    local HOSTNAME="$1"
+    grep -w "\"$HOSTNAME\"" hosts.json &> /dev/null
+    [ ! $? -eq 0 ] && echo "Error: hostname not found!" && exit 1
+
     ping -c 1 $HOSTNAME &> /dev/null
-    [ $? -eq 0 ] && echo && echo "Success: host $HOSTNAME started in $SECONDS seconds!" && break
-done
+    [ $? -eq 0 ] && echo "Success: host $HOSTNAME already alive!" && exit 0
+
+    echo "Waking up $HOSTNAME, be patient. It can take few minutes..."
+    wget -q --no-check-certificate  -O - "https://startup.emi.u-bordeaux.fr/wol?h[]=$HOSTNAME" &> /dev/null
+    [ ! $? -eq 0 ] && echo "Error: wake on lan..." && exit 1
+
+    while : ; do
+        echo -n "*"
+        ping -c 1 $HOSTNAME &> /dev/null
+        [ $? -eq 0 ] && echo && echo "Success: host $HOSTNAME started in $SECONDS seconds!" && break
+    done
+
+}
+
+#################### LOAD ####################
 
 # load / users...
 # ssh -o "StrictHostKeyChecking=no" $HOSTNAME loginctl
 
+#################### MAIN ####################
+
+getargs
+
+[ "$MODE" = "ping" ] && mping "$HOSTS"
+[ "$MODE" = "boot" ] && mboot "$HOSTS"
+
 echo "done!"
+
 # EOF
