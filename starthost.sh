@@ -60,6 +60,8 @@ function getargs() {
         esac
     done
 
+    echo "Hosts: $HOSTS"
+
     # check args
     if [ $# -eq 0 ] ; then usage ; fi
     if [ -z "$MODE" ] ; then usage ; fi
