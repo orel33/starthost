@@ -51,18 +51,18 @@ function getargs() {
                 HOSTS+=$(getRoom "$ROOM")
             ;;
             h)
-                USAGE
+                usage
             ;;
             \?)
                 echo "Invalid option!"
-                USAGE
+                usage
             ;;
         esac
     done
 
     # check args
-    if [ $# -eq 0 ] ; then USAGE ; fi
-    if [ -z "$MODE" ] ; then USAGE ; fi
+    if [ $# -eq 0 ] ; then usage ; fi
+    if [ -z "$MODE" ] ; then usage ; fi
 
 }
 
