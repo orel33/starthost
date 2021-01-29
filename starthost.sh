@@ -10,6 +10,7 @@ function ctrl_c() { echo "Abort!" && kill -9 $$ ; }
 
 #################### HOST ROOM ####################
 
+WATCH=0
 MODE="PING"
 HOSTS=""
 
@@ -17,7 +18,8 @@ function usage() {
     echo "Usage: $0 [options] host [...]" 
     echo "-p : ping mode (default)"
     echo "-b : boot mode"
-    echo "-r <room> : room number (007, 101, 102, ...)" 
+    echo "-r <room> : room number (007, 101, 102, ...)"
+    echo "-w : watch"
     return 0
 }
 
@@ -36,11 +38,12 @@ function getRoom()
 #################### PARSE ARGS ####################
 
 function parseArgs() {
-    while getopts "bpr:h" OPT; do
+    while getopts "wbpr:h" OPT; do
         case $OPT in
             p ) MODE="PING" ;;
             b ) MODE="BOOT" ;;
-            r ) HOSTS+=$(getRoom "$OPTARG") ;;
+	    w ) WATCH=1 ;;
+	    r ) HOSTS+=$(getRoom "$OPTARG") ;;
             h ) usage && exit 0 ;;
             * ) usage && exit 1 ;;
         esac
@@ -79,23 +82,30 @@ function mping() {
 
 function mboot() {
     echo "===== Boot Hosts ====="
-    local HOSTNAME="$1"
-    grep -w "\"$HOSTNAME\"" hosts.json &> /dev/null
-    [ ! $? -eq 0 ] && echo "Error: hostname not found!" && exit 1
+    local HOSTS="$*"
 
-    ping -c 1 $HOSTNAME &> /dev/null
-    [ $? -eq 0 ] && echo "Success: host $HOSTNAME already alive!" && exit 0
+    for HOST in $HOSTS ; do
 
-    echo "Waking up $HOSTNAME, be patient. It can take few minutes..."
-    wget -q --no-check-certificate  -O - "https://startup.emi.u-bordeaux.fr/wol?h[]=$HOSTNAME" &> /dev/null
-    [ ! $? -eq 0 ] && echo "Error: wake on lan..." && exit 1
+	# check
+	# grep -w "\"$HOSTNAME\"" hosts.json &> /dev/null
+	# [ ! $? -eq 0 ] && echo "Error: hostname not found!" && exit 1
+    
+	# ping -c 1 $HOSTNAME &> /dev/null
+	# [ $? -eq 0 ] && echo "Success: host $HOSTNAME already alive!"
 
-    while : ; do
-        echo -n "*"
-        ping -c 1 $HOSTNAME &> /dev/null
-        [ $? -eq 0 ] && echo && echo "Success: host $HOSTNAME started in $SECONDS seconds!" && break
+	echo "Waking up $HOST, be patient. It can take few minutes..."
+	wget -q --no-check-certificate  -O - "https://startup.emi.u-bordeaux.fr/wol?h[]=$HOSTNAME" &> /dev/null &
+	# [ ! $? -eq 0 ] && echo "Error: wake on lan..." && exit 1
+
+	# while : ; do
+        #     echo -n "*"
+        #     ping -c 1 $HOSTNAME &> /dev/null
+        #     [ $? -eq 0 ] && echo && echo "Success: host $HOSTNAME started in $SECONDS seconds!" && break
+	# done
+
     done
 
+    return 0
 }
 
 #################### MISC ####################
