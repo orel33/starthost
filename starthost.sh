@@ -35,7 +35,7 @@ function usage() {
 }
 
 function getargs() {
-    while getopts "pt:r:h" OPT; do
+    while getopts "bpt:r:h" OPT; do
         case $OPT in
             p)
                 MODE="PING"
@@ -44,7 +44,8 @@ function getargs() {
                 MODE="BOOT"
             ;;
             t)
-                HOSTS+=" $OPTARG"
+		local HOST="$OPTARG"
+                HOSTS+=" $HOST"
             ;;
             r)
                 local ROOM="$OPTARG"
@@ -60,21 +61,23 @@ function getargs() {
         esac
     done
 
-    echo "Hosts: $HOSTS"
 
     # check args
     if [ $# -eq 0 ] ; then usage ; fi
     if [ -z "$MODE" ] ; then usage ; fi
+    echo "Mode:$MODE"
 
+    return 0
 }
 
 #################### PING MODE ####################
 
 function mping() {
     echo "===== Host Monitoring ====="
-    local HOSTS="$1"
+    local HOSTS="$*"
+    echo "Target Hosts: $HOSTS"
     echo "ping..."
-    fping "$HOSTS"
+    fping $HOSTS
     return 0
 }
 
@@ -101,17 +104,22 @@ function mboot() {
 
 }
 
-#################### LOAD ####################
+#################### MISC ####################
 
 # load / users...
 # ssh -o "StrictHostKeyChecking=no" $HOSTNAME loginctl
 
+# test windows !!!
+#  nmap -Pn -6 cezanne
+# =>les ports 139 et 445 sont ouverts, le poste est sous windows
+
+
 #################### MAIN ####################
 
-getargs
+getargs $*
 
-[ "$MODE" = "ping" ] && mping "$HOSTS"
-[ "$MODE" = "boot" ] && mboot "$HOSTS"
+[ "$MODE" = "PING" ] && mping $HOSTS
+[ "$MODE" = "BOOT" ] && mboot $HOSTS
 
 echo "done!"
 
