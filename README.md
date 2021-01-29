@@ -1,2 +1,2 @@
 # starthost
-Start Host @ CREMI
+Start Host using WOL @CREMI.
