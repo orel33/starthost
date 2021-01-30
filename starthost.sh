@@ -1,6 +1,13 @@
 #!/bin/bash
 
-HOSTFILE="./hosts.json"
+BASEDIR="/net/ens/starthost/"
+# BASEDIR="$(realpath $(dirname $0))"                                                                                                                      
+# BASEDIR="$(dirname $(readlink -f $0))"
+# echo "BASEDIR=$BASEDIR"
+
+HOSTFILE="$BASEDIR/hosts.json"
+
+#################### TRAP CTRL-C ####################
 
 trap ctrl_c INT
 function ctrl_c() { echo "Abort!" && kill -9 $$ ; }
@@ -84,6 +91,7 @@ function mboot() {
     echo "===== Boot Hosts ====="
     local HOSTS="$*"
 
+    echo "Waking up hosts, be patient. It can take few minutes..."
     for HOST in $HOSTS ; do
 
 	# check
@@ -93,17 +101,18 @@ function mboot() {
 	# ping -c 1 $HOSTNAME &> /dev/null
 	# [ $? -eq 0 ] && echo "Success: host $HOSTNAME already alive!"
 
-	echo "Waking up $HOST, be patient. It can take few minutes..."
-	wget -q --no-check-certificate  -O - "https://startup.emi.u-bordeaux.fr/wol?h[]=$HOSTNAME" &> /dev/null &
-	# [ ! $? -eq 0 ] && echo "Error: wake on lan..." && exit 1
-
-	# while : ; do
-        #     echo -n "*"
-        #     ping -c 1 $HOSTNAME &> /dev/null
-        #     [ $? -eq 0 ] && echo && echo "Success: host $HOSTNAME started in $SECONDS seconds!" && break
-	# done
+	echo "booting $HOST..."
+	# curl -gk 'https://startup.emi.u-bordeaux.fr/wol?h[]=bird&h[]=sopck&h[]=machineinexistante'
+	wget -q --no-check-certificate  -O - "https://startup.emi.u-bordeaux.fr/wol?h[]=$HOST" &> /dev/null
+	# [ ! $? -eq 0 ] && echo "Error: wake on lan!" 
 
     done
+
+    # while : ; do
+    # 	echo -n "*"
+    #     ping -c 1 $HOST &> /dev/null
+    #     [ $? -eq 0 ] && echo && echo "Success: host $HOST started in $SECONDS seconds!" && break
+    # done
 
     return 0
 }
